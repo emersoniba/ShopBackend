@@ -18,7 +18,10 @@ from .serializers import (
     RegistroUsuarioSerializer,
     LoginSerializer,
     UsuarioRolSerializer,
+    PersonaCreateSerializer,
 )
+
+
 @extend_schema(tags=["Gestión de Users"])
 class AuthViewSet(viewsets.GenericViewSet):
     permission_classes = [AllowAny]
@@ -27,48 +30,49 @@ class AuthViewSet(viewsets.GenericViewSet):
     def get_serializer_context(self):
         """Pasar request al serializer"""
         context = super().get_serializer_context()
-        context['request'] = self.request
+        context["request"] = self.request
         return context
 
     @action(detail=False, methods=["post"], url_path="login")
     def login(self, request):
-        serializer = self.get_serializer(data=request.data, context={'request': request})
-        
+        serializer = self.get_serializer(
+            data=request.data, context={"request": request}
+        )
+
         if not serializer.is_valid():
             errors = serializer.errors
             error_message = "Error de autenticación"
             remaining_attempts = None
             wait_minutes = None
-            
+
             # Extraer información del error
             if isinstance(errors, dict):
-                if 'non_field_errors' in errors:
-                    error_detail = errors['non_field_errors'][0]
+                if "non_field_errors" in errors:
+                    error_detail = errors["non_field_errors"][0]
                     if isinstance(error_detail, dict):
-                        #error_message = error_detail.get('message', 'Credenciales inválidas')
-                        error_message = error_detail.get('message', 'Usuario no encontrado')
-                        remaining_attempts = error_detail.get('remaining_attempts')
-                        wait_minutes = error_detail.get('wait_minutes')
-                elif 'username' in errors:
-                    error_message = str(errors['username'][0])
-                elif 'password' in errors:
-                    error_message = str(errors['password'][0])
-            
+                        # error_message = error_detail.get('message', 'Credenciales inválidas')
+                        error_message = error_detail.get(
+                            "message", "Usuario no encontrado"
+                        )
+                        remaining_attempts = error_detail.get("remaining_attempts")
+                        wait_minutes = error_detail.get("wait_minutes")
+                elif "username" in errors:
+                    error_message = str(errors["username"][0])
+                elif "password" in errors:
+                    error_message = str(errors["password"][0])
+
             # Construir respuesta de error personalizada
-            response_data = {
-                "message": error_message,
-                "errors": errors
-            }
-            
+            response_data = {"message": error_message, "errors": errors}
+
             if remaining_attempts is not None:
                 response_data["remaining_attempts"] = remaining_attempts
             if wait_minutes is not None:
                 response_data["wait_minutes"] = wait_minutes
-            
+
             return ErrorResponse(
                 message=error_message,
                 errors=response_data,
-                status_code=status.HTTP_401_UNAUTHORIZED
+                status_code=status.HTTP_401_UNAUTHORIZED,
             )
 
         user = serializer.validated_data["user"]
@@ -91,8 +95,7 @@ class AuthViewSet(viewsets.GenericViewSet):
                 "user": user_serializer.data,
             },
         )
-        
-        
+
     @action(detail=False, methods=["post"], url_path="register")
     def register(self, request):
         serializer = RegistroUsuarioSerializer(data=request.data)
@@ -259,7 +262,15 @@ class UsuarioViewSet(RestViewSet):
         except Exception as e:
             return ErrorResponse(message="Error al asignar rol", errors=str(e))
 
-    @extend_schema(parameters=[OpenApiParameter(name="rol_id",type=OpenApiTypes.INT,location=OpenApiParameter.PATH, )])
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="rol_id",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.PATH,
+            )
+        ]
+    )
     @action(detail=True, methods=["delete"], url_path="quitar-rol/(?P<rol_id>[^/.]+)")
     def quitar_rol(self, request, pk=None, rol_id=None):
         usuario = self.get_object()
@@ -281,6 +292,70 @@ class UsuarioViewSet(RestViewSet):
         serializer = UsuarioRolSerializer(usuario_roles, many=True)
 
         return SuccessResponse(message="Roles del usuario", data=serializer.data)
+
+    # Agregar estos métodos al final de la clase UsuarioViewSet
+
+    @action(detail=True, methods=["delete"])
+    def soft_delete(self, request, pk=None):
+        """Eliminación lógica de usuario"""
+        usuario = self.get_object()
+        usuario.soft_delete()
+        return SuccessResponse(
+            message=f"Usuario {usuario.username} eliminado lógicamente",
+            data={
+                "id": usuario.id,
+                "username": usuario.username,
+                "is_deleted": usuario.is_deleted,
+            },
+        )
+
+    @action(detail=True, methods=["post"])
+    def restore(self, request, pk=None):
+        """Restaurar usuario eliminado lógicamente"""
+        usuario = self.get_object()
+        usuario.restore()
+        return SuccessResponse(
+            message=f"Usuario {usuario.username} restaurado",
+            data={
+                "id": usuario.id,
+                "username": usuario.username,
+                "is_active": usuario.is_active,
+            },
+        )
+
+    @action(detail=False, methods=["get"])
+    def usuarios_eliminados(self, request):
+        """Listar usuarios eliminados lógicamente"""
+        usuarios = Usuario.objects.filter(is_deleted=True)
+        serializer = self.get_serializer(usuarios, many=True)
+        return SuccessResponse(message="Usuarios eliminados", data=serializer.data)
+
+    @action(detail=False, methods=['post'])
+    def crear_persona_con_usuario(self, request):
+        """Endpoint para crear Persona y Usuario automáticamente"""
+        serializer = PersonaCreateSerializer(data=request.data, context={'request': request})
+        
+        if not serializer.is_valid():
+            return ErrorResponse(
+                message="Error en los datos",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        
+        result = serializer.save()
+        
+        return SuccessResponse(
+            message="Persona y Usuario creados exitosamente",
+            data={
+                "persona": PersonaSerializer(result['persona']).data,
+                "usuario": {
+                    "id": result['usuario'].id,
+                    "username": result['username_generado'],
+                    "password": result['password_generado']
+                }
+            },
+            status_code=status.HTTP_201_CREATED
+        )
 
 
 @extend_schema(tags=["Gestion de Personas"])

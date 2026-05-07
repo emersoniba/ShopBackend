@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from modulos.utilitario.models import AuditoriaBase
+from django.utils import timezone
 
 class Persona(AuditoriaBase):
     ci = models.CharField("Carnet de la persona", max_length=20, unique=True, primary_key=True)
@@ -45,6 +46,10 @@ class Usuario(AbstractUser):
     )
     roles = models.ManyToManyField(Rol, through='UsuarioRol', related_name='usuarios')
     
+    # Soft delete: campo para eliminación lógica
+    is_deleted = models.BooleanField("Eliminado", default=False)
+    deleted_at = models.DateTimeField("Fecha de eliminación", null=True, blank=True)
+    
     class Meta:
         verbose_name = 'Usuario'
         verbose_name_plural = 'Usuarios'
@@ -53,6 +58,20 @@ class Usuario(AbstractUser):
         if self.persona:
             return f"{self.username} - {self.persona.nombres} {self.persona.apellido_paterno or ''}"
         return self.username
+    
+    def soft_delete(self):
+        """Método para eliminación lógica"""
+        self.is_deleted = True
+        self.is_active = False
+        self.deleted_at = timezone.now()
+        self.save()
+    
+    def restore(self):
+        """Método para restaurar usuario eliminado lógicamente"""
+        self.is_deleted = False
+        self.is_active = True
+        self.deleted_at = None
+        self.save()
 
 class UsuarioRol(models.Model):
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='usuario_roles')
