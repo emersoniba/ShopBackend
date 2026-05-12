@@ -3,6 +3,7 @@ from .models import Usuario, Persona, Rol, UsuarioRol
 from django.contrib.auth.hashers import check_password, make_password
 from .rate_limiter import LoginRateLimiter
 from django.utils import timezone
+from typing import Optional
 
 class PersonaSerializer(serializers.ModelSerializer):
     nombre_completo = serializers.SerializerMethodField()
@@ -20,7 +21,7 @@ class PersonaSerializer(serializers.ModelSerializer):
     def get_nombre_completo(self, obj)->str:
         return f"{obj.nombres} {obj.apellido_paterno or ''} {obj.apellido_materno or ''}".strip()
     
-    def get_username_generado(self, obj):
+    def get_username_generado(self, obj) -> Optional[str]:
         """Generar username basado en nombres y apellidos"""
         if obj.nombres and obj.apellido_paterno:
             nombre_partes = obj.nombres.split()

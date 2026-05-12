@@ -48,7 +48,9 @@ APP_TRIRD = [
 ]
 APP_LOCAL = [
     "modulos.utilitario",
-    "modulos.users"
+    "modulos.users",
+    "modulos.productos",
+    
 ]
 INSTALLED_APPS = APP_BASE + APP_TRIRD + APP_LOCAL
 
@@ -102,6 +104,8 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 10,
 }
 
 # Configuración de JWT
