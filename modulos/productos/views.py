@@ -12,12 +12,13 @@ class CustomPagination(PageNumberPagination):
     """Paginación personalizada"""
     page_size = 10
     page_size_query_param = 'page_size'
-    max_page_size = 100
+    max_page_size = 500
     page_query_param = 'page'
 
 class CategoriaViewSet(RestViewSet):
     """CRUD completo de categorías"""
-    queryset = Categoria.objects.all()
+    #queryset = Categoria.objects.all()
+    queryset = Categoria.objects.prefetch_related('productos')
     serializer_class = CategoriaSerializer
     pagination_class = CustomPagination
     
@@ -36,7 +37,8 @@ class CategoriaViewSet(RestViewSet):
 
 class ProductoViewSet(RestViewSet):
     """CRUD completo de productos"""
-    queryset = Producto.objects.all()
+    #queryset = Producto.objects.all()
+    queryset = Producto.objects.prefetch_related('categorias')
     pagination_class = CustomPagination
     
     def get_permissions(self):
@@ -46,7 +48,7 @@ class ProductoViewSet(RestViewSet):
         return [AllowAny()]
     
     def get_serializer_class(self):
-        if self.action == 'retrieve':
+        if self.action in ['create', 'update', 'partial_update', 'retrieve']:
             return ProductoDetailSerializer
         return ProductoListSerializer
     
@@ -90,6 +92,11 @@ class ProductoViewSet(RestViewSet):
         queryset = queryset.order_by(orden)
         
         return queryset
+    def perform_create(self, serializer):
+        serializer.save(creado_por=self.request.user)
+        
+    def perform_update(self, serializer):
+        serializer.save(modificado_por=self.request.user)
     
     @action(detail=False, methods=['get'], permission_classes=[AllowAny])
     def publicos(self, request):

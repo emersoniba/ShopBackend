@@ -33,7 +33,7 @@ class Categoria(AuditoriaBase):
 class Producto(AuditoriaBase):
     """Producto para la tienda"""
     nombre = models.CharField("Nombre", max_length=200)
-    slug = models.SlugField("Slug", max_length=200,blank=True, unique=True)
+    slug = models.SlugField("Slug", max_length=200,blank=True)
     descripcion_corta = models.TextField("Descripción corta", max_length=500)
     descripcion_larga = models.TextField("Descripción larga", blank=True)
     precio = models.DecimalField("Precio", max_digits=10, decimal_places=2)

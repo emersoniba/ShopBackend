@@ -1,13 +1,14 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from django.utils.text import slugify
 import base64
 from django.core.files.base import ContentFile
 from .models import Categoria, Producto
+from drf_spectacular.utils import extend_schema_field
 
-
-class Base64ImageField(serializers.Field):
+@extend_schema_field(serializers.CharField)
+class Base64ImageField(serializers.Field):   
     """Campo personalizado para manejar imágenes en Base64"""
-    
     def to_internal_value(self, data):
         """Convertir Base64 a archivo"""
         if not data:
@@ -64,10 +65,12 @@ class ProductoListSerializer(serializers.ModelSerializer):
             'destacado', 'oferta', 'nuevo', 'mas_vendido', 'calificacion_promedio',
             'total_resenas', 'tiene_stock', 'categoria_nombres', 'categoria_ids'
         ]
-    
+        
+    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
     def get_categoria_nombres(self, obj):
         return [cat.nombre for cat in obj.categorias.all()]
     
+    @extend_schema_field(serializers.ListField(child=serializers.IntegerField()))
     def get_categoria_ids(self, obj):
         return [cat.id for cat in obj.categorias.all()]
 
@@ -75,7 +78,11 @@ class ProductoDetailSerializer(serializers.ModelSerializer):
     """Serializer para detalle de producto (completo)"""
     categorias = CategoriaSerializer(many=True, read_only=True)
     categoria_ids = serializers.PrimaryKeyRelatedField(
-        many=True, write_only=True, queryset=Categoria.objects.all(), source='categorias'
+        many=True,
+        write_only=True,
+        queryset=Categoria.objects.all(),
+        source='categorias', 
+        required=False
     )
     precio_actual = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     descuento_porcentaje = serializers.IntegerField(read_only=True)
@@ -85,13 +92,20 @@ class ProductoDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Producto
         fields = '__all__'
-    
+        read_only_fields = [
+            'id',
+            'creado_por',
+            'fecha_creacion',
+            'fecha_modificacion',
+            'modificado_por',
+        ]
     def create(self, validated_data):
         categorias = validated_data.pop('categorias', [])
         if not validated_data.get('slug'):
             validated_data['slug'] = slugify(validated_data['nombre'])
         producto = Producto.objects.create(**validated_data)
-        producto.categorias.set(categorias)
+        if categorias:
+            producto.categorias.set(categorias)
         return producto
     
     def update(self, instance, validated_data):
