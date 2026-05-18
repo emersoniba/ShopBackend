@@ -51,6 +51,17 @@ class ProductoListSerializer(serializers.ModelSerializer):
             return obj.imagen_principal.url
         return None
 
+    
+    def get_imagen_principal_url(self, obj):
+        if obj.imagen_principal:
+            request = self.context.get('request')
+            if request:
+                # Construir URL absoluta
+                return request.build_absolute_uri(obj.imagen_principal.url)
+            return obj.imagen_principal.url
+        return None
+    
+    
 class ProductoDetailSerializer(serializers.ModelSerializer):
     categorias = CategoriaSerializer(many=True, read_only=True)
     categoria_ids = serializers.PrimaryKeyRelatedField(
@@ -104,10 +115,11 @@ class ProductoDetailSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         categorias = validated_data.pop('categorias', None)
         
-        if 'nombre' in validated_data and not validated_data.get('slug'):
+        # Actualizar slug si cambió el nombre
+        if 'nombre' in validated_data:
             instance.slug = slugify(validated_data['nombre'])
         
-        # Actualizar campos incluyendo imagen_principal
+        # Actualizar campos
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         

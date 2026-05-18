@@ -1,3 +1,5 @@
+from django.utils import timezone
+
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -8,6 +10,7 @@ from modulos.utilitario.viewset import RestViewSet
 from modulos.utilitario.response import SuccessResponse, ErrorResponse
 from .models import Categoria, Producto
 from .serializers import CategoriaSerializer, ProductoListSerializer, ProductoDetailSerializer
+import json
 
 class CustomPagination(PageNumberPagination):
     page_size = 10
@@ -34,7 +37,7 @@ class CategoriaViewSet(RestViewSet):
 class ProductoViewSet(RestViewSet):
     queryset = Producto.objects.prefetch_related('categorias', 'imagenes')
     pagination_class = CustomPagination
-    # IMPORTANTE: Agregar parsers para aceptar multipart/form-data
+    # Cambiar el orden de los parsers: FormData primero
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     
     def get_permissions(self):
@@ -88,7 +91,33 @@ class ProductoViewSet(RestViewSet):
         serializer.save(creado_por=self.request.user)
         
     def perform_update(self, serializer):
-        serializer.save(modificado_por=self.request.user)
+        serializer.save(
+            modificado_por=self.request.user, fecha_modificacion=timezone.now()
+        )
+    def create(self, request, *args, **kwargs):
+        """Manejar creación con FormData"""
+        # Si es multipart/form-data, procesar los datos correctamente
+        if request.content_type and 'multipart/form-data' in request.content_type:
+            # Ya está en request.data, DRF lo procesa automáticamente
+            pass
+        return super().create(request, *args, **kwargs)
+    
+    def update(self, request, *args, **kwargs):
+        """Manejar actualización con FormData usando PATCH"""
+        partial = kwargs.pop('partial', False)
+        
+        # Obtener la instancia
+        instance = self.get_object()
+        
+        # Procesar datos de formulario (DRF ya los tiene en request.data)
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
+        return SuccessResponse(
+            message="Producto actualizado exitosamente",
+            data=serializer.data
+        )
     
     @action(detail=False, methods=['get'], permission_classes=[AllowAny])
     def publicos(self, request):

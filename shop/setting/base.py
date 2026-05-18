@@ -16,20 +16,18 @@ IS_PROD = ENV == 'production'
 # ============================================
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-@acdpp^hg94)-&rof*0en8t^wficii+m5ju-lmjk!%p4ed$!36')
 DEBUG = os.getenv('DJANGO_DEBUG', 'True') == 'True'
+
+# CORREGIDO: Eliminada duplicación y Render
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
-# Para Render, permitir el host generado
-if IS_PROD:
-    ALLOWED_HOSTS.append('*.onrender.com')
+# Para desarrollo, permitir más hosts
+if IS_DEV:
+    ALLOWED_HOSTS.extend(['192.168.0.9', '10.0.2.2'])
 
 AUTH_USER_MODEL = "users.Usuario"
 
 print(f"🌍 Entorno: {ENV.upper()}")
-
-ALLOWED_HOSTS = os.getenv(
-    'DJANGO_ALLOWED_HOSTS',
-    'localhost,127.0.0.1'
-).split(',')
+print(f"📋 ALLOWED_HOSTS: {ALLOWED_HOSTS}")
 
 APP_BASE = [
     "django.contrib.admin",
@@ -84,16 +82,20 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "shop.wsgi.application"
 
+# CORREGIDO: CORS para desarrollo local
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:4200",  # Puerto por defecto de Angular
-    "http://localhost:8081",  # Expo web react navtive
-    "http://10.0.2.2:8000",  # Emulador Androidreact navtive
-    "http://192.168.0.9:8000",         # Tu IP local (agregar esta línea)
-    "http://192.168.0.9",  
-    "http://localhost:8100", # ionic angular
-    #"http://192.168.0.9:8100", # ionic angular celular prueba
+    "http://localhost:4200",
+    "http://localhost:4201",
+    "http://localhost:8100",
+    "http://192.168.0.9:4200",
+    "http://192.168.0.9:8100",
+    "http://10.0.2.2:8000",
 ]
-CORS_ALLOW_ALL_ORIGINS = True
+
+# No permitir todos los orígenes en producción
+CORS_ALLOW_ALL_ORIGINS = IS_DEV  # Solo en desarrollo
+
+CORS_ALLOW_CREDENTIALS = True
 
 # Configuración de Django REST Framework
 REST_FRAMEWORK = {
@@ -104,22 +106,22 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-   # "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
-    #"PAGE_SIZE": 10,
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
 }
 
 # Configuración de JWT
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(hours=2),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
-    # "ACCESS_TOKEN_LIFETIME": timedelta(minutes=1),  # ⏰ Cambiado a 1 minuto
-    # "REFRESH_TOKEN_LIFETIME": timedelta(minutes=2), # ⏰ 2 minutos para refresco
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
     "USER_ID_FIELD": "id",
     "USER_ID_CLAIM": "user_id",
 }
+
 # Configuración de Swagger / Spectacular
 SPECTACULAR_SETTINGS = {
     "TITLE": "Api de tienda shop",
@@ -127,8 +129,6 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
 }
-# Password validation
-# https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -145,8 +145,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
-# Internationalization
 LANGUAGE_CODE = "es-bo"
 TIME_ZONE = "America/La_Paz"
 USE_I18N = True
@@ -155,3 +153,32 @@ USE_TZ = True
 STATIC_URL = "static/"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+
+USE_X_FORWARDED_HOST = True
+
+# Configuración de logging para depuración
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'DEBUG',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}
